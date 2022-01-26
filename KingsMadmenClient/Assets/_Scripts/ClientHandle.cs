@@ -1,0 +1,136 @@
+﻿using System.Collections;
+using System.Collections.Generic;
+using System.Net;
+using UnityEngine;
+
+public class ClientHandle : MonoBehaviour
+{
+    public static void Welcome(Packet _packet)
+    {
+        string _msg = _packet.ReadString();
+        int _myId = _packet.ReadInt();
+
+        Debug.Log($"Message from server: {_msg}");
+        Client.instance.myId = _myId;
+        ClientSend.WelcomeReceived();
+
+        // Now that we have the client's id, connect UDP
+        Client.instance.udp.Connect(((IPEndPoint)Client.instance.tcp.socket.Client.LocalEndPoint).Port);
+    }
+
+    public static void SpawnPlayer(Packet _packet)
+    {
+        int _id = _packet.ReadInt();
+        string _username = _packet.ReadString();
+        Vector3 _position = _packet.ReadVector3();
+        Quaternion _rotation = _packet.ReadQuaternion();
+
+        GameManager.instance.SpawnPlayer(_id, _username, _position, _rotation);
+    }
+
+    public static void PlayerPosition(Packet _packet)
+    {
+        int _id = _packet.ReadInt();
+        Vector3 _position = _packet.ReadVector3();
+
+        if (GameManager.players.ContainsKey(_id))
+        {
+            GameManager.players[_id].transform.position = _position;
+        }
+    }
+
+    public static void PlayerRotation(Packet _packet)
+    {
+        int _id = _packet.ReadInt();
+        Quaternion _rotation = _packet.ReadQuaternion();
+
+        if (GameManager.players.ContainsKey(_id))
+        {
+            GameManager.players[_id].transform.rotation = _rotation;
+        }
+    }
+
+    public static void PlayerDisconnected(Packet _packet)
+    {
+        int _id = _packet.ReadInt();
+
+        Destroy(GameManager.players[_id].gameObject);
+        GameManager.players.Remove(_id);
+    }
+
+    public static void PlayerHealth(Packet _packet)
+    {
+        int _id = _packet.ReadInt();
+        float _health = _packet.ReadFloat();
+
+        GameManager.players[_id].SetHealth(_health);
+    }
+
+    public static void PlayerRespawned(Packet _packet)
+    {
+        int _id = _packet.ReadInt();
+
+        GameManager.players[_id].Respawn();
+    }
+
+    public static void PlayerAnimRun(Packet _packet)
+    {
+        int _id = _packet.ReadInt();
+        bool _isRunning = _packet.ReadBool();
+
+        if (GameManager.players.ContainsKey(_id))
+        {
+            if (GameManager.players[_id].gameObject.name == "Player(Clone)")
+            {
+                if(_isRunning)
+                {
+                    GameManager.players[_id].GetComponentInChildren<GoblinAnimNetwork>().Move();
+                }
+                else
+                {
+                    GameManager.players[_id].GetComponentInChildren<GoblinAnimNetwork>().Iddle();
+                }
+            }
+        }
+    }
+
+    public static void EnemyMoved(Packet _packet)
+    {
+        int _id = _packet.ReadInt();
+        Vector3 _pos = _packet.ReadVector3();
+
+        GameObject.Find("EnemyManager").transform.GetChild(_id).position = _pos;
+    }
+
+    public static void EnemyRotation(Packet _packet)
+    {
+        int _id = _packet.ReadInt();
+        Quaternion _rot = _packet.ReadQuaternion();
+
+        GameObject.Find("EnemyManager").transform.GetChild(_id).rotation = _rot;
+    }
+
+    public static void EnemyAnim(Packet _packet)
+    {
+        int _id = _packet.ReadInt();
+        int _state = _packet.ReadInt();
+
+        GameObject.Find("EnemyManager").transform.GetChild(_id).GetComponent<EnemyClient>().ChangeState(_state);
+    }
+
+    public static void EnemyDamaged(Packet _packet)
+    {
+        int _id = _packet.ReadInt();
+        float _damage = _packet.ReadFloat();
+
+        GameObject.Find("EnemyManager").transform.GetChild(_id).GetComponent<EnemyClient>().GetDamaged(_damage);
+    }
+
+    public static void UpdateBlock(Packet _packet)
+    {
+        int _id = _packet.ReadInt();
+        Vector3 _pos = _packet.ReadVector3();
+
+        GameObject.Find("ACTIVATORS").transform.GetChild(_id + 2).position = _pos;
+    }
+}
